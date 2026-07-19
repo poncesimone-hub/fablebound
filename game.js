@@ -210,23 +210,19 @@ function criarBoss(scene, tipo, x, y) {
 }
 
 function desenharElementos(scene) {
-    // Remover graphics antigos
     scene.children.list = scene.children.list.filter(child => child.type !== 'Graphics');
     
     const graphics = scene.make.graphics({ x: 0, y: 0, add: false });
     
-    // Desenhar tiros
     tiros.forEach(tiro => {
         graphics.fillStyle(tiro.color, 1);
         graphics.fillCircle(tiro.x, tiro.y, 5);
     });
     
-    // Desenhar bosses
     bosses.forEach(boss => {
         graphics.fillStyle(0x800000, 1);
         graphics.fillRect(boss.x - 30, boss.y - 40, 60, 80);
         
-        // Barra de HP
         graphics.fillStyle(0x333333, 1);
         graphics.fillRect(boss.x - 30, boss.y - 50, 60, 5);
         graphics.fillStyle(0xFF0000, 1);
