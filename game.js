@@ -17,6 +17,7 @@ const config = {
     parent: 'game',
     render: {
         pixelArt: true,
+        antialias: false,
         antialiasGL: false
     }
 };
@@ -30,15 +31,13 @@ let moedas = 0;
 let hp = 100;
 let hpMax = 100;
 let magiaAtual = 'raio';
-let barra_especial = 0;
 let tiros_raio = 30;
-let tiros_gelo = 0;
-let tiros_fogo = 0;
 let podePularDuplo = true;
 let emAr = false;
 let velocidadeBase = 5;
 let ultimo_tiro = 0;
 let scene_global = null;
+let graphics = null;
 
 function preload() {}
 
@@ -46,28 +45,27 @@ function create() {
     const scene = this;
     scene_global = this;
     
+    // Fundo simples
     this.add.rectangle(640, 360, 1280, 720).setFill(0x87CEEB);
     
+    // Chão
     const chao = this.add.rectangle(640, 700, 1280, 40).setFill(0x228B22);
     this.physics.add.existing(chao);
     chao.body.setImmovable(true);
     
+    // Laura (personagem)
     laura = this.add.rectangle(640, 600, 40, 60, 0xC80000);
     this.physics.add.existing(laura);
     laura.body.setBounce(0.2);
     laura.body.setCollideWorldBounds(true);
     laura.body.setDrag(0.99);
     
-    this.add.circle(640, 575, 8, 0xFFC896);
-    
-    this.add.line(640, 600, 0, 0, 30, 0, 0x000000).setStrokeStyle(3);
-    this.add.circle(670, 600, 4, 0xFFFFFF);
-    
     this.physics.add.collider(laura, chao, () => {
         emAr = false;
         podePularDuplo = true;
     });
     
+    // Controles
     const keys = this.input.keyboard;
     keys.on('keydown-A', () => laura.body.setVelocityX(-velocidadeBase * 10));
     keys.on('keydown-D', () => laura.body.setVelocityX(velocidadeBase * 10));
@@ -77,31 +75,33 @@ function create() {
     keys.on('keydown-2', () => magiaAtual = 'gelo');
     keys.on('keydown-3', () => magiaAtual = 'fogo');
     
+    // Primeiro boss
     criarBoss(this, 'dragao', 200, 300);
     
-    this.uiText = this.add.text(10, 10, '', { fontSize: '16px', fill: '#fff', fontStyle: 'bold' });
+    // UI Text
+    this.uiText = this.add.text(10, 10, '', { fontSize: '14px', fill: '#fff', fontStyle: 'bold' });
 }
 
 function update() {
     if (!scene_global) return;
     
+    // Remover tiros fora da tela
     tiros = tiros.filter(tiro => tiro.x < 1280);
+    
+    // Atualizar posição dos tiros
     tiros.forEach(tiro => {
         tiro.x += tiro.velocidade;
     });
     
-    bosses.forEach((boss, idx) => {
+    // Movimento dos bosses
+    bosses.forEach((boss) => {
         boss.x += boss.vx;
         if (boss.x <= 0 || boss.x + 60 >= 1280) {
             boss.vx = -boss.vx;
         }
-        
-        boss.contador_ataque++;
-        if (boss.contador_ataque >= boss.intervalo_ataque) {
-            boss.contador_ataque = 0;
-        }
     });
     
+    // Colisão tiros com bosses
     tiros.forEach((tiro, tIdx) => {
         bosses.forEach((boss, bIdx) => {
             const dist = Phaser.Math.Distance.Between(tiro.x, tiro.y, boss.x, boss.y);
@@ -120,17 +120,15 @@ function update() {
         });
     });
     
-    let uiTexto = `HP: ${Math.max(0, hp)}/${hpMax}\n`;
-    uiTexto += `Moedas: ${moedas}\n`;
-    uiTexto += `Magia: ${magiaAtual.toUpperCase()}\n`;
-    uiTexto += `Raio: ${tiros_raio} | Gelo: ${tiros_gelo} | Fogo: ${tiros_fogo}\n`;
-    uiTexto += `Especial: ${Math.floor(barra_especial)}%\n`;
+    // Atualizar UI
+    let uiTexto = `HP: ${Math.max(0, hp)}/${hpMax} | Moedas: ${moedas}\n`;
+    uiTexto += `Magia: ${magiaAtual.toUpperCase()} | Tiros: ${tiros_raio}\n`;
     if (bosses.length > 0) {
-        uiTexto += `Boss: ${bosses[0].nome} (HP: ${bosses[0].hp}/${bosses[0].hp_max})`;
+        uiTexto += `Boss: ${bosses[0].nome} HP: ${Math.max(0, bosses[0].hp)}/${bosses[0].hp_max}`;
     }
-    
     scene_global.uiText.setText(uiTexto);
     
+    // Desenhar elementos
     desenharElementos(scene_global);
 }
 
@@ -159,9 +157,7 @@ function atirar() {
             tipo: 'raio',
             color: 0xFFD700
         });
-        barra_especial = Math.min(100, barra_especial + (100/30));
-    } else if (magiaAtual === 'gelo' && tiros_gelo > 0) {
-        tiros_gelo--;
+    } else if (magiaAtual === 'gelo' && tiros_raio > 5) {
         tiros.push({
             x: laura.x + 30,
             y: laura.y,
@@ -170,9 +166,7 @@ function atirar() {
             tipo: 'gelo',
             color: 0xADD8E6
         });
-        barra_especial = Math.min(100, barra_especial + (100/30));
-    } else if (magiaAtual === 'fogo' && tiros_fogo > 0) {
-        tiros_fogo--;
+    } else if (magiaAtual === 'fogo' && tiros_raio > 10) {
         tiros.push({
             x: laura.x + 30,
             y: laura.y,
@@ -181,19 +175,17 @@ function atirar() {
             tipo: 'fogo',
             color: 0xFFA500
         });
-        barra_especial = Math.min(100, barra_especial + (100/30));
     }
 }
 
 function criarBoss(scene, tipo, x, y) {
     const bosses_info = {
-        dragao: { nome: 'Dragao', hp: 150, dano: 15, intervalo: 60, recompensa: 5 },
-        cavaleiro: { nome: 'Cavaleiro', hp: 120, dano: 12, intervalo: 50, recompensa: 4 },
-        mago: { nome: 'Mago', hp: 100, dano: 18, intervalo: 45, recompensa: 5 },
+        dragao: { nome: 'Dragao', hp: 100, dano: 15, recompensa: 5 },
+        cavaleiro: { nome: 'Cavaleiro', hp: 80, dano: 12, recompensa: 4 },
+        mago: { nome: 'Mago', hp: 70, dano: 18, recompensa: 5 },
     };
     
-    const info = bosses_info[tipo];
-    if (!info) return;
+    const info = bosses_info[tipo] || bosses_info.dragao;
     
     bosses.push({
         x: x,
@@ -203,33 +195,36 @@ function criarBoss(scene, tipo, x, y) {
         hp: info.hp,
         hp_max: info.hp,
         dano: info.dano,
-        intervalo_ataque: info.intervalo,
-        recompensa_moedas: info.recompensa,
-        contador_ataque: 0
+        recompensa_moedas: info.recompensa
     });
 }
 
 function desenharElementos(scene) {
-    scene.children.list = scene.children.list.filter(child => child.type !== 'Graphics');
+    // Limpar graphics antigos
+    if (graphics) {
+        graphics.destroy();
+    }
     
-    const graphics = scene.make.graphics({ x: 0, y: 0, add: false });
+    graphics = scene.make.graphics({ x: 0, y: 0, add: true });
     
+    // Desenhar tiros (simples)
     tiros.forEach(tiro => {
         graphics.fillStyle(tiro.color, 1);
-        graphics.fillCircle(tiro.x, tiro.y, 5);
+        graphics.fillCircle(tiro.x, tiro.y, 4);
     });
     
+    // Desenhar bosses
     bosses.forEach(boss => {
+        // Corpo do boss
         graphics.fillStyle(0x800000, 1);
-        graphics.fillRect(boss.x - 30, boss.y - 40, 60, 80);
+        graphics.fillRect(boss.x - 25, boss.y - 35, 50, 70);
         
+        // Barra de HP
         graphics.fillStyle(0x333333, 1);
-        graphics.fillRect(boss.x - 30, boss.y - 50, 60, 5);
-        graphics.fillStyle(0xFF0000, 1);
-        const hp_percent = boss.hp / boss.hp_max;
-        graphics.fillRect(boss.x - 30, boss.y - 50, 60 * hp_percent, 5);
+        graphics.fillRect(boss.x - 25, boss.y - 45, 50, 4);
+        
+        graphics.fillStyle(0x00FF00, 1);
+        const hp_percent = Math.max(0, boss.hp / boss.hp_max);
+        graphics.fillRect(boss.x - 25, boss.y - 45, 50 * hp_percent, 4);
     });
-    
-    graphics.generateTexture('elementos', 1280, 720);
-    scene.add.image(640, 360, 'elementos');
 }
